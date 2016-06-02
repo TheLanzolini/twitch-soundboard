@@ -1,0 +1,28 @@
+{
+  "name": "twitch-soundboard",
+  "version": "1.0.0",
+  "description": "An electron application that plays sound based on chat for a specific channel",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheLanzolini/twitch-soundboard"
+  },
+  "keywords": [
+    "Electron"
+  ],
+  "author": "TheLanzolini",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/TheLanzolini/twitch-soundboard/issues"
+  },
+  "homepage": "https://thelanzolini.github.io/twitch-soundboard",
+  "devDependencies": {
+    "electron-prebuilt": "^1.1.2"
+  },
+  "dependencies": {
+    "tmi.js": "0.0.29"
+  }
+}
