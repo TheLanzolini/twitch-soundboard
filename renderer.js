@@ -1,5 +1,6 @@
-var irc = require("tmi.js");
+const irc = require("tmi.js");
 const {ipcRenderer} = require('electron');
+const request = require('request');
 
 var credentials = ipcRenderer.sendSync('request-credentials', true);
 
@@ -42,6 +43,8 @@ window.sounds = sounds;
 var config = document.getElementById('config');
 var sounds_elem = document.getElementById('sounds');
 var welcome_elem = document.getElementById('welcome');
+var followers_elem = document.getElementById('followers');
+var subscribers_elem = document.getElementById('subscribers');
 
 var bot_config_elem = document.createElement('div');
 var username_elem = document.createElement('div');
@@ -179,12 +182,14 @@ function joinChannel(username, key, channel){
     bot_config_elem.removeChild(join_elem);
   });
   client.on("join", function (channel, username) {
-    console.log(`${username} joined!`);
-    sounds[2].element.play();
-    var joiner_elem = document.createElement('span');
-    joiners.push(username);
-    joiner_elem.innerHTML = '   ' + username + '   ';
-    welcome_elem.appendChild(joiner_elem);
+    joiners.unshift(username);
+    ipcRenderer.sendSync("save-joiners", {joiners});
+    updateJoiners();
+  });
+  client.on("subscription", function(channel, username){
+    var sub_elem = document.createElement('div');
+    sub_elem.innerHTML = username;
+    subscribers_elem.appendChild(sub_elem);
   });
 }
 
@@ -196,6 +201,32 @@ function onChat(channel, user, message, self){
     }
   });
 }
+
+function updateJoiners(){
+  var last_joiners = joiners.slice(0, 10);
+  welcome_elem.innerHTML = '';
+  last_joiners.forEach(joiner => {
+    var joiner_elem = document.createElement('div');
+    joiner_elem.innerHTML = joiner;
+    welcome_elem.appendChild(joiner_elem);
+  });
+}
+
+setInterval(function(){
+  console.log('getting follows');
+  request(`https://api.twitch.tv/kraken/channels/${credentials.channel.replace('#', '')}/follows`, function(err, response, body){
+    followers_elem.innerHTML = '';
+    var obj = JSON.parse(body);
+    console.log(obj);
+    obj.follows.forEach(follow => {
+      var follow_elem = document.createElement('div');
+      var created_at = new Date(follow.created_at);
+      follow_elem.innerHTML = follow.user.name + ' ' + created_at.toLocaleString();
+      followers_elem.appendChild(follow_elem);
+    })
+  });  
+}, 300000);
+
 
 
 

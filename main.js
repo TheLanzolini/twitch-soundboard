@@ -94,5 +94,14 @@ ipcMain.on('request-credentials', (event, arg) => {
   });
 });
 
+ipcMain.on('save-joiners', (event, arg) => {
+  var joinertxt = arg.joiners.join('\n');
+  event.returnValue = 'saved';
+  fs.writeFile(`${__dirname}/joiners.txt`, joinertxt, err => {
+    if(err) throw err;
+    console.log('joiners saved');
+  });
+});
+
 
 

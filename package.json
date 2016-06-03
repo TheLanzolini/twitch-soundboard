@@ -23,6 +23,7 @@
     "electron-prebuilt": "^1.1.2"
   },
   "dependencies": {
+    "request": "^2.72.0",
     "tmi.js": "0.0.29"
   }
 }
