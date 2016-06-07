@@ -3,120 +3,71 @@ const {ipcRenderer} = require('electron');
 const request = require('request');
 const {dialog} = require('electron').remote;
 
-var credentials = ipcRenderer.sendSync('request-credentials', true);
+const webview = document.getElementById('webview');
+const indicator = document.querySelector('.indicator');
+
+let token, client, channel, soundQueue = [], messageQueue = [], timeouts = {}, TIMEOUT_TIME = 10000;
+
+const container = document.getElementById('container');
+
+const uriToJSON = function(uriString){
+  return JSON.parse('{"' + decodeURI(uriString).replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}');
+}
+
+const loadstart = () => {
+  indicator.innerText = 'Loading...';
+  // SHOW loading icon
+};
+
+const loadstop = () => {
+  indicator.innerText = '';
+  // Hide loading icon
+};
+
+const fetchTwitchUser = (token) => {
+  return fetch('https://api.twitch.tv/kraken/user', {method: 'GET', headers: { 'Accept': 'application/vnd.twitchtv.v3+json', 'Authorization': 'OAuth '+token }})
+    .then(function(response){
+      return response.json();
+    }).catch(function(err){
+      console.log('parsing failed', err);
+    });
+}
+
+const onRedirect = (e) => {
+  if(e.newURL.includes('http://localhost/#access_token=')){
+    token = e.newURL.replace('http://localhost/#access_token=', '').replace('&scope=chat_login+user_read','');
+    fetchTwitchUser(token).then(res => {
+      channel = res.name;
+      joinChannel(res.name, token, res.name);
+      renderSoundBoard();
+    });
+  }
+};
+
+webview.addEventListener('did-start-loading', loadstart);
+webview.addEventListener('did-stop-loading', loadstop);
+webview.addEventListener('did-get-redirect-request', onRedirect);
 
 var sounds = ipcRenderer.sendSync('request-sounds', true).sounds || [];
 
-var TIMEOUT_TIME = credentials.TIMEOUT_TIME || 600000;
-
-var client;
-var joiners = [];
-var sound_queue = [];
-var message_queue = [];
-var timeouts = {};
-
-var config = document.getElementById('config');
-var sounds_elem = document.getElementById('sounds');
-
-var bot_config_elem = document.createElement('div');
-var username_elem = document.createElement('div');
-var username_label = document.createElement('label');
-var username_input = document.createElement('input');
-username_input.setAttribute('id', 'username-input');
-username_input.setAttribute('type', 'text');
-username_label.innerHTML = 'Bot Username';
-username_label.setAttribute('for', 'username-input');
-
-if(!!credentials && credentials.username){
-  username_input.value = credentials.username;
+function renderSoundBoard(){
+  var logout = document.createElement('button');
+  logout.setAttribute('id', 'logout');
+  logout.innerHTML = 'Logout';
+  logout.addEventListener('click', function(){
+    ipcRenderer.sendSync('request-logout', true);
+  });
+  container.innerHTML = '';
+  var sounds_elem = document.createElement('div');
+  sounds_elem.setAttribute('id', 'soundsContainer');
+  container.appendChild(sounds_elem);
+  container.insertBefore(logout, sounds_elem);
+  renderSounds();
+  renderAddSound();
 }
-
-username_elem.appendChild(username_label);
-username_elem.appendChild(username_input);
-
-var oauth_elem = document.createElement('div');
-var oauth_label = document.createElement('label');
-var oauth_input = document.createElement('input');
-
-oauth_input.setAttribute('id', 'oauth-input');
-oauth_input.setAttribute('type', 'password');
-oauth_label.innerHTML = 'Oauth Key';
-oauth_label.setAttribute('for', 'oauth-input');
-
-if(!!credentials && credentials.key){
-  oauth_input.value = credentials.key;
-}
-
-oauth_elem.appendChild(oauth_label);
-oauth_elem.appendChild(oauth_input);
-
-var channel_elem = document.createElement('div');
-var channel_label = document.createElement('label');
-var channel_input = document.createElement('input');
-
-channel_input.setAttribute('id', 'channel-input');
-channel_input.setAttribute('type', 'text');
-channel_label.innerHTML = 'Channel';
-channel_label.setAttribute('for', 'channel-input');
-
-if(!!credentials && credentials.channel){
-  channel_input.value = credentials.channel;
-}
-
-channel_elem.appendChild(channel_label);
-channel_elem.appendChild(channel_input);
-
-var timeout_elem = document.createElement('div');
-var timeout_label = document.createElement('label');
-var timeout_input = document.createElement('input');
-
-timeout_input.value = TIMEOUT_TIME;
-
-timeout_input.addEventListener('change', function(){
-  TIMEOUT_TIME = parseInt(timeout_input.value);
-
-});
-
-timeout_input.setAttribute('id', 'timeout-input');
-timeout_input.setAttribute('type', 'number');
-timeout_label.innerHTML = 'Timeout (in milliseconds)';
-timeout_label.setAttribute('for', 'timeout-input');
-
-timeout_elem.appendChild(timeout_label);
-timeout_elem.appendChild(timeout_input);
-
-var join_elem = document.createElement('button');
-join_elem.innerHTML = 'Join';
-join_elem.addEventListener('click', function(e){
-  joinChannel(username_input.value, oauth_input.value, channel_input.value);
-});
-
-var bot_config_hidden = false;
-var hide_config = document.createElement('span');
-hide_config.style.display = 'block';
-hide_config.innerHTML = 'Hide Config';
-hide_config.addEventListener('click', function(e){
-  if(bot_config_hidden){
-    hide_config.innerHTML = 'Hide Config';
-    bot_config_elem.style.display = 'block';
-    bot_config_hidden = false;
-  }else{
-    hide_config.innerHTML = 'Show Config';
-    bot_config_elem.style.display = 'none';
-    bot_config_hidden = true;
-  }
-});
-
-bot_config_elem.appendChild(username_elem);
-bot_config_elem.appendChild(oauth_elem);
-bot_config_elem.appendChild(channel_elem);
-bot_config_elem.appendChild(join_elem);
-bot_config_elem.appendChild(timeout_elem);
-
-config.appendChild(bot_config_elem);
-config.appendChild(hide_config);
 
 function renderSounds(){
+  var sounds_elem = document.getElementById('soundsContainer');
   sounds_elem.innerHTML = '';
   sounds.forEach(function(sound){
     var sound_container = document.createElement('div');
@@ -146,49 +97,53 @@ function renderSounds(){
     
   });
 }
-renderSounds();
 
-var newSoundModel = {id: sounds.length + 1};
-var select_sound = document.getElementById('select-sound');
-select_sound.addEventListener('click', function(e){
-  console.log("wants to add sound");
-  dialog.showOpenDialog({
-    title: 'thetitle',
-    filters: [
-      {name: 'Audio', extensions: ['ogg', 'mp3']}
-    ],
-    buttonLabel: 'Select Sound',
-    properties: ['openFile']
-  }, function(filenames){
-    console.log(filenames);
-    if(filenames){
-      newSoundModel.path = filenames[0];
-      select_sound.innerHTML = filenames[0];
+function renderAddSound(){
+  var newSoundModel = {};
+  var new_sound_container = document.createElement('div');
+  var command_label = document.createElement('label');
+  command_label.setAttribute('for', 'command-input');
+  command_label.innerHTML = 'Command';
+  var command_input = document.createElement('input');
+  command_input.setAttribute('id', 'command-input');
+  command_input.addEventListener('change', function(){
+    newSoundModel.command = command_input.value;
+  });
+  var select_sound = document.createElement('button');
+  select_sound.setAttribute('id', 'select-sound');
+  select_sound.innerHTML = 'Select Sound';
+  select_sound.addEventListener('click', function(){
+    dialog.showOpenDialog({
+      title: 'Select Sound Effect',
+      filters: [{name: 'Audio', extensions: ['ogg', 'mp3']}],
+      buttonLabel: 'Select Sound',
+      properties: ['openFile']
+    }, function(filenames){
+      if(filenames){
+        newSoundModel.path = filenames[0];
+        select_sound.innerHTML = filenames[0];
+      }
+    });
+  });
+  var submit_sound = document.createElement('button');
+  submit_sound.innerHTML = 'Submit';
+  submit_sound.addEventListener('click', function(){
+    if(newSoundModel.command && newSoundModel.path){
+      sounds.push(newSoundModel);
+      ipcRenderer.sendSync('save-sounds', {sounds});
+      renderSounds();
+      command_input.value = '';
+      select_sound.innerHTML = 'Select Sound';
     }
   });
-});
-var command_input = document.getElementById('command-input');
-command_input.addEventListener('change', function(){
-  newSoundModel.command = command_input.value;
-});
-var sound_submit = document.getElementById('sound-submit');
-sound_submit.addEventListener('click', function(){
-  if(newSoundModel.path && newSoundModel.command){
-    sounds.push(newSoundModel);
-    ipcRenderer.sendSync('save-sounds', {sounds});
-    select_sound.innerHTML = 'Select Sound';
-    command_input.value = '';
-    newSoundModel = {};
-    renderSounds();
-  }else{
-    console.log('needs either command or path');
-  }
-});
-
-
-function joinChannel(username, key, channel){
-  // oauth:u919tdncow0ag7dhzu7mdg59d16stp
-  var options = {
+  new_sound_container.appendChild(command_label);
+  new_sound_container.appendChild(command_input);
+  new_sound_container.appendChild(select_sound);
+  new_sound_container.appendChild(submit_sound);
+  container.appendChild(new_sound_container);
+}
+const joinChannel = (username, key, channel) => {
+  const options = {
     options: {
         debug: true
     },
@@ -206,8 +161,7 @@ function joinChannel(username, key, channel){
   client.connect();
   client.on("chat", onChat);
   client.on("connected", function(address, port){
-    ipcRenderer.sendSync('save-credentials', {username, key, channel, TIMEOUT_TIME});
-    bot_config_elem.removeChild(join_elem);
+    console.log('connected');
   });
 }
 
@@ -217,9 +171,9 @@ function onChat(channel, user, message, self){
     if(message.includes(sound.command)){
       if(!timeouts[user.username] || timeouts[user.username] < now){
         timeouts[user.username] = now + TIMEOUT_TIME;
-        sound_queue.push({sound, message, user});
+        soundQueue.push({sound, message, user});
       }else if(timeouts[user.username] && timeouts[user.username] > now){
-        message_queue.push(`${user.username} your sound is on cooldown for ${timeouts[user.username] - now}`);
+        messageQueue.push(`${user.username} your sound is on cooldown for ${timeouts[user.username] - now}`);
       }
       return;
     }
@@ -227,8 +181,8 @@ function onChat(channel, user, message, self){
 }
 
 setInterval(function(){
-  if(sound_queue.length > 0){
-    var first = sound_queue.shift();
+  if(soundQueue.length > 0){
+    var first = soundQueue.shift();
     first.sound.element.play();
     console.log(`Sound message ${first.message}`);
     ipcRenderer.sendSync('latest-sound', first);
@@ -236,36 +190,11 @@ setInterval(function(){
 }, 10000);
 
 setInterval(function(){
-  if(message_queue.length > 0){
-    var first = message_queue.shift();
-    client.say(channel_input.value, first);
+  if(messageQueue.length > 0){
+    var first = messageQueue.shift();
+    client.say(channel, first);
   }
 }, 2000);
-
-// function updateJoiners(){
-//   var last_joiners = joiners.slice(0, 10);
-//   welcome_elem.innerHTML = '';
-//   last_joiners.forEach(joiner => {
-//     var joiner_elem = document.createElement('div');
-//     joiner_elem.innerHTML = joiner;
-//     welcome_elem.appendChild(joiner_elem);
-//   });
-// }
-
-// setInterval(function(){
-//   console.log('getting follows');
-//   request(`https://api.twitch.tv/kraken/channels/${credentials.channel.replace('#', '')}/follows`, function(err, response, body){
-//     followers_elem.innerHTML = '';
-//     var obj = JSON.parse(body);
-//     console.log(obj);
-//     obj.follows.forEach(follow => {
-//       var follow_elem = document.createElement('div');
-//       var created_at = new Date(follow.created_at);
-//       follow_elem.innerHTML = follow.user.name + ' ' + created_at.toLocaleString();
-//       followers_elem.appendChild(follow_elem);
-//     })
-//   });  
-// }, 300000);
 
 
 

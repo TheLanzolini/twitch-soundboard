@@ -3,24 +3,17 @@
   <head>
     <meta charset="UTF-8">
     <title>Twitch Soundboard</title>
+    <style>
+      html, body, #container, webview{
+        height: 100%;
+        margin: 0;
+      }
+    </style>
   </head>
   <body>
-    <h1>Twitch Soundboard</h1>
-    <div id="config"></div>
-    <!-- <div>WELCOME</div>
-    <div id="welcome">Welcome! </div> -->
-    <br>
-    <!-- <div>FOLLOWERS</div>
-    <div id="followers"></div> -->
-    <br>
-    <!-- <div>SUBSCRIBERS</div>
-    <div id="subscribers"></div> -->
-    <div id="sounds"></div>
-    <div id="add-sound">
-      <label for="command-input">Command</label>
-      <input id="command-input" type="text">
-      <button id="select-sound">Select Sound</button>
-      <button id="sound-submit">Submit</button>
+    <div class="indicator"></div>
+    <div id="container">
+      <webview id="webview" src="https://api.twitch.tv/kraken/oauth2/authorize?response_type=token&client_id=q46wkxq4ibxan13mwlqzu6fzu24r7ym&redirect_uri=http%3A%2F%2Flocalhost&scope=chat_login+user_read"></webview>
     </div>
   </body>
   <script> require('./renderer.js') </script>

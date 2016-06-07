@@ -18,28 +18,12 @@ function createWindow () {
   mainWindow = new BrowserWindow({
     width: 800, height: 600
   })
-  
-  exports.mainWindow = mainWindow;
 
   // and load the index.html of the app.
   mainWindow.loadURL(`file://${__dirname}/index.html`)
 
   // Open the DevTools.
   mainWindow.webContents.openDevTools()
-  
-  
-  // const {dialog} = require('electron');
-  // 
-  // dialog.showOpenDialog(mainWindow, {
-  //   title: 'thetitle',
-  //   filters: [
-  //     {name: 'Audio', extensions: ['ogg', 'mp3']}
-  //   ],
-  //   buttonLabel: 'Select Sound',
-  //   properties: ['multiSelections', 'openFile']
-  // }, function(filenames){
-  //   console.log(filenames);
-  // });
 
   // Emitted when the window is closed.
   mainWindow.on('closed', function () {
@@ -75,13 +59,37 @@ app.on('activate', function () {
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
 
+
+function logout(){
+  mainWindow.webContents.session.cookies.get({}, function(error, cookies){
+    if(error){
+      return console.log(error);
+    }
+    for(var i = cookies.length; i >= 0; i--){
+      if(cookies[i]){
+        var url = "http" + (cookies[i].secure ? "s" : "") + "://" +cookies[i].domain + cookies[i].path;
+        var name = cookies[i].name;
+        mainWindow.webContents.session.cookies.remove(url, name, function(error){
+          if(error){
+            return console.log(error);
+          }
+        });
+      }
+    }
+  });
+}
+
+ipcMain.on('request-logout', (event,arg) => {
+  event.returnValue = true;
+  logout();
+  mainWindow.reload();
+});
+
 ipcMain.on('save-credentials', (event, arg) => {
-  console.log(arg);  // prints "ping"
   event.returnValue = 'saved';
   
   fs.writeFile(`${__dirname}/credentials.json`, JSON.stringify(arg), (err) => {
     if (err) throw err;
-    console.log('It\'s saved!');
   });
   
 });
@@ -91,7 +99,6 @@ ipcMain.on('request-credentials', (event, arg) => {
     if(err){ 
       return event.returnValue = false;
     }
-    console.log('data', data);
     event.returnValue = JSON.parse(data);
   });
 });
@@ -101,7 +108,6 @@ ipcMain.on('request-sounds', (event, arg) => {
     if(err){ 
       return event.returnValue = false;
     }
-    console.log('data', data);
     event.returnValue = JSON.parse(data);
   });
 });
@@ -110,7 +116,6 @@ ipcMain.on('save-sounds', (event, arg) => {
   event.returnValue = 'saved';
   fs.writeFile(`${__dirname}/sounds.json`, JSON.stringify(arg), (err) => {
     if (err) throw err;
-    console.log('It\'s saved!');
   });
 });
 
@@ -119,7 +124,6 @@ ipcMain.on('latest-sound', (event, arg) => {
   const latest = `${arg.user.username}: ${arg.message}`;
   fs.writeFile(`${__dirname}/latest.txt`, latest, (err) => {
     if (err) throw err;
-    console.log('It\'s saved!');
   });
 });
 
