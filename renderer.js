@@ -1,50 +1,22 @@
 const irc = require("tmi.js");
 const {ipcRenderer} = require('electron');
 const request = require('request');
+const {dialog} = require('electron').remote;
 
 var credentials = ipcRenderer.sendSync('request-credentials', true);
 
+var sounds = ipcRenderer.sendSync('request-sounds', true).sounds || [];
+
+var TIMEOUT_TIME = credentials.TIMEOUT_TIME || 600000;
+
 var client;
 var joiners = [];
-var sounds = [
-  {
-    id: 1,
-    command: '!sad',
-    path: '/Users/alexlanzoni/downloads/sadtrombone.mp3',
-    cost: 0
-  },
-  {
-    id: 2,
-    command: '!genji',
-    path: '/Users/alexlanzoni/downloads/253.ogg',
-    cost: 0
-  },
-  {
-    id: 3,
-    command: '!welcome',
-    path: '/Users/alexlanzoni/downloads/fine.ogg',
-    cost: 0
-  },
-  {
-    id: 4,
-    command: '!bastion',
-    path: '/Users/alexlanzoni/downloads/Bastion Ultimate.ogg',
-    cost: 0
-  },
-  {
-    id: 5,
-    command: '!dropthebeat',
-    path: '/Users/alexlanzoni/downloads/Let\'s Drop the Beat.ogg',
-    cost: 0
-  }
-]
-window.sounds = sounds;
+var sound_queue = [];
+var message_queue = [];
+var timeouts = {};
 
 var config = document.getElementById('config');
 var sounds_elem = document.getElementById('sounds');
-var welcome_elem = document.getElementById('welcome');
-var followers_elem = document.getElementById('followers');
-var subscribers_elem = document.getElementById('subscribers');
 
 var bot_config_elem = document.createElement('div');
 var username_elem = document.createElement('div');
@@ -94,6 +66,25 @@ if(!!credentials && credentials.channel){
 channel_elem.appendChild(channel_label);
 channel_elem.appendChild(channel_input);
 
+var timeout_elem = document.createElement('div');
+var timeout_label = document.createElement('label');
+var timeout_input = document.createElement('input');
+
+timeout_input.value = TIMEOUT_TIME;
+
+timeout_input.addEventListener('change', function(){
+  TIMEOUT_TIME = parseInt(timeout_input.value);
+
+});
+
+timeout_input.setAttribute('id', 'timeout-input');
+timeout_input.setAttribute('type', 'number');
+timeout_label.innerHTML = 'Timeout (in milliseconds)';
+timeout_label.setAttribute('for', 'timeout-input');
+
+timeout_elem.appendChild(timeout_label);
+timeout_elem.appendChild(timeout_input);
+
 var join_elem = document.createElement('button');
 join_elem.innerHTML = 'Join';
 join_elem.addEventListener('click', function(e){
@@ -120,11 +111,13 @@ bot_config_elem.appendChild(username_elem);
 bot_config_elem.appendChild(oauth_elem);
 bot_config_elem.appendChild(channel_elem);
 bot_config_elem.appendChild(join_elem);
+bot_config_elem.appendChild(timeout_elem);
 
 config.appendChild(bot_config_elem);
 config.appendChild(hide_config);
 
 function renderSounds(){
+  sounds_elem.innerHTML = '';
   sounds.forEach(function(sound){
     var sound_container = document.createElement('div');
     sound_container.classList.add('sound-container');
@@ -135,12 +128,17 @@ function renderSounds(){
     var sound_command = document.createElement('span');
     sound_command.innerHTML = sound.command;
     
-    var sound_cost = document.createElement('span');
-    sound_cost.innerHTML = sound.cost;
+    var sound_delete = document.createElement('span');
+    sound_delete.innerHTML = 'Delete';
+    sound_delete.addEventListener('click', function(){
+      sounds.splice( sounds.indexOf(sound), 1 );
+      ipcRenderer.sendSync('save-sounds', {sounds});
+      renderSounds();
+    });
     
     sound_container.appendChild(sound_player);
     sound_container.appendChild(sound_command);
-    sound_container.appendChild(sound_cost);
+    sound_container.appendChild(sound_delete);
     
     sound.element = sound_player;
     
@@ -150,10 +148,41 @@ function renderSounds(){
 }
 renderSounds();
 
-
-var add_sound = document.getElementById('add-sound');
-add_sound.addEventListener('click', function(e){
+var newSoundModel = {id: sounds.length + 1};
+var select_sound = document.getElementById('select-sound');
+select_sound.addEventListener('click', function(e){
   console.log("wants to add sound");
+  dialog.showOpenDialog({
+    title: 'thetitle',
+    filters: [
+      {name: 'Audio', extensions: ['ogg', 'mp3']}
+    ],
+    buttonLabel: 'Select Sound',
+    properties: ['openFile']
+  }, function(filenames){
+    console.log(filenames);
+    if(filenames){
+      newSoundModel.path = filenames[0];
+      select_sound.innerHTML = filenames[0];
+    }
+  });
+});
+var command_input = document.getElementById('command-input');
+command_input.addEventListener('change', function(){
+  newSoundModel.command = command_input.value;
+});
+var sound_submit = document.getElementById('sound-submit');
+sound_submit.addEventListener('click', function(){
+  if(newSoundModel.path && newSoundModel.command){
+    sounds.push(newSoundModel);
+    ipcRenderer.sendSync('save-sounds', {sounds});
+    select_sound.innerHTML = 'Select Sound';
+    command_input.value = '';
+    newSoundModel = {};
+    renderSounds();
+  }else{
+    console.log('needs either command or path');
+  }
 });
 
 
@@ -177,55 +206,66 @@ function joinChannel(username, key, channel){
   client.connect();
   client.on("chat", onChat);
   client.on("connected", function(address, port){
-    ipcRenderer.sendSync('save-credentials', {username, key, channel});
-    // join_elem.innerHTML = 'Joined!';
+    ipcRenderer.sendSync('save-credentials', {username, key, channel, TIMEOUT_TIME});
     bot_config_elem.removeChild(join_elem);
-  });
-  client.on("join", function (channel, username) {
-    joiners.unshift(username);
-    ipcRenderer.sendSync("save-joiners", {joiners});
-    updateJoiners();
-  });
-  client.on("subscription", function(channel, username){
-    var sub_elem = document.createElement('div');
-    sub_elem.innerHTML = username;
-    subscribers_elem.appendChild(sub_elem);
   });
 }
 
 function onChat(channel, user, message, self){
-  console.log(`${user.username}: ${message}`);
+  var now = new Date().getTime();
   sounds.forEach(sound => {
-    if( message.includes( sound.command ) ){
-      sound.element.play();
+    if(message.includes(sound.command)){
+      if(!timeouts[user.username] || timeouts[user.username] < now){
+        timeouts[user.username] = now + TIMEOUT_TIME;
+        sound_queue.push({sound, message, user});
+      }else if(timeouts[user.username] && timeouts[user.username] > now){
+        message_queue.push(`${user.username} your sound is on cooldown for ${timeouts[user.username] - now}`);
+      }
+      return;
     }
   });
 }
 
-function updateJoiners(){
-  var last_joiners = joiners.slice(0, 10);
-  welcome_elem.innerHTML = '';
-  last_joiners.forEach(joiner => {
-    var joiner_elem = document.createElement('div');
-    joiner_elem.innerHTML = joiner;
-    welcome_elem.appendChild(joiner_elem);
-  });
-}
+setInterval(function(){
+  if(sound_queue.length > 0){
+    var first = sound_queue.shift();
+    first.sound.element.play();
+    console.log(`Sound message ${first.message}`);
+    ipcRenderer.sendSync('latest-sound', first);
+  }
+}, 10000);
 
 setInterval(function(){
-  console.log('getting follows');
-  request(`https://api.twitch.tv/kraken/channels/${credentials.channel.replace('#', '')}/follows`, function(err, response, body){
-    followers_elem.innerHTML = '';
-    var obj = JSON.parse(body);
-    console.log(obj);
-    obj.follows.forEach(follow => {
-      var follow_elem = document.createElement('div');
-      var created_at = new Date(follow.created_at);
-      follow_elem.innerHTML = follow.user.name + ' ' + created_at.toLocaleString();
-      followers_elem.appendChild(follow_elem);
-    })
-  });  
-}, 300000);
+  if(message_queue.length > 0){
+    var first = message_queue.shift();
+    client.say(channel_input.value, first);
+  }
+}, 2000);
+
+// function updateJoiners(){
+//   var last_joiners = joiners.slice(0, 10);
+//   welcome_elem.innerHTML = '';
+//   last_joiners.forEach(joiner => {
+//     var joiner_elem = document.createElement('div');
+//     joiner_elem.innerHTML = joiner;
+//     welcome_elem.appendChild(joiner_elem);
+//   });
+// }
+
+// setInterval(function(){
+//   console.log('getting follows');
+//   request(`https://api.twitch.tv/kraken/channels/${credentials.channel.replace('#', '')}/follows`, function(err, response, body){
+//     followers_elem.innerHTML = '';
+//     var obj = JSON.parse(body);
+//     console.log(obj);
+//     obj.follows.forEach(follow => {
+//       var follow_elem = document.createElement('div');
+//       var created_at = new Date(follow.created_at);
+//       follow_elem.innerHTML = follow.user.name + ' ' + created_at.toLocaleString();
+//       followers_elem.appendChild(follow_elem);
+//     })
+//   });  
+// }, 300000);
 
 
 

@@ -18,6 +18,8 @@ function createWindow () {
   mainWindow = new BrowserWindow({
     width: 800, height: 600
   })
+  
+  exports.mainWindow = mainWindow;
 
   // and load the index.html of the app.
   mainWindow.loadURL(`file://${__dirname}/index.html`)
@@ -94,12 +96,30 @@ ipcMain.on('request-credentials', (event, arg) => {
   });
 });
 
-ipcMain.on('save-joiners', (event, arg) => {
-  var joinertxt = arg.joiners.join('\n');
+ipcMain.on('request-sounds', (event, arg) => {
+  fs.readFile(`${__dirname}/sounds.json`, 'utf-8', (err, data) => {
+    if(err){ 
+      return event.returnValue = false;
+    }
+    console.log('data', data);
+    event.returnValue = JSON.parse(data);
+  });
+});
+
+ipcMain.on('save-sounds', (event, arg) => {
   event.returnValue = 'saved';
-  fs.writeFile(`${__dirname}/joiners.txt`, joinertxt, err => {
-    if(err) throw err;
-    console.log('joiners saved');
+  fs.writeFile(`${__dirname}/sounds.json`, JSON.stringify(arg), (err) => {
+    if (err) throw err;
+    console.log('It\'s saved!');
+  });
+});
+
+ipcMain.on('latest-sound', (event, arg) => {
+  event.returnValue = 'saved';
+  const latest = `${arg.user.username}: ${arg.message}`;
+  fs.writeFile(`${__dirname}/latest.txt`, latest, (err) => {
+    if (err) throw err;
+    console.log('It\'s saved!');
   });
 });
 
