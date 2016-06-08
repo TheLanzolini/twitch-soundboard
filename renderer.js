@@ -77,9 +77,11 @@ function renderSounds(){
     sound_player.setAttribute('controls', true);
     
     var sound_command = document.createElement('span');
+    sound_command.classList.add('command');
     sound_command.innerHTML = sound.command;
     
-    var sound_delete = document.createElement('span');
+    var sound_delete = document.createElement('button');
+    sound_delete.classList.add('delete');
     sound_delete.innerHTML = 'Delete';
     sound_delete.addEventListener('click', function(){
       sounds.splice( sounds.indexOf(sound), 1 );
@@ -101,6 +103,7 @@ function renderSounds(){
 function renderAddSound(){
   var newSoundModel = {};
   var new_sound_container = document.createElement('div');
+  new_sound_container.classList.add('new-sound-container');
   var command_label = document.createElement('label');
   command_label.setAttribute('for', 'command-input');
   command_label.innerHTML = 'Command';
@@ -121,7 +124,7 @@ function renderAddSound(){
     }, function(filenames){
       if(filenames){
         newSoundModel.path = filenames[0];
-        select_sound.innerHTML = filenames[0];
+        select_sound.innerHTML = '-Selected';
       }
     });
   });

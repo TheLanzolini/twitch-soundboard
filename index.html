@@ -7,11 +7,66 @@
       html, body, #container, webview{
         height: 100%;
         margin: 0;
+        text-align: center;
       }
+      html{
+        background-color: #815fc0;
+        font-family: Arial, 'sans-serif';
+        color: white;
+      }
+      @font-face {
+        font-family: Dimitri;
+        src: url(DIMITRI_.TTF);
+      }
+      .header h1{
+        font-family: Dimitri;
+        font-size: 48px;
+        color: white;
+        text-shadow: 0px 5px 0px #6441AB;
+      }
+      button{
+        color: white;
+        font-family: Dimitri;
+        background-color: #6441AB;
+        padding: 5px;
+        border: none;
+        font-size: 22px;
+      }
+      input{
+        font-size: 16px;
+        padding: 5px;
+        margin: 0 5px;
+      }
+      #select-sound{
+        margin-right: 5px;  
+      }
+      button:active{
+        background-color: #4b307b;
+      }
+      button:hover{
+        background-color: #4b307b;
+        cursor: pointer;
+      }
+      #logout{
+        margin-bottom: 10px;
+      }
+      .new-sound-container{
+        margin-top: 10px;
+      }
+      .command{
+        min-width: 200px;
+        padding-left: 10px;
+        text-align: left;
+        display: inline-block;
+      }
+
     </style>
   </head>
   <body>
     <div class="indicator"></div>
+    <div class="header">
+      <h1>Twitch Soundboard</h1>
+    </div>
     <div id="container">
       <webview id="webview" src="https://api.twitch.tv/kraken/oauth2/authorize?response_type=token&client_id=q46wkxq4ibxan13mwlqzu6fzu24r7ym&redirect_uri=http%3A%2F%2Flocalhost&scope=chat_login+user_read"></webview>
     </div>
