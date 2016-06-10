@@ -57,11 +57,39 @@ function renderSoundBoard(){
   logout.addEventListener('click', function(){
     ipcRenderer.sendSync('request-logout', true);
   });
+  
+  var add_channel_container = document.createElement('div');
+  add_channel_container.classList.add('add-channel-container');
+  
+  var add_channel_label = document.createElement('label');
+  add_channel_label.setAttribute('for', 'add-channel-input');
+  add_channel_label.innerHTML = 'Channel Override';
+  
+  var add_channel_input = document.createElement('input');
+  add_channel_input.setAttribute('id', 'add-channel-input');
+  add_channel_input.setAttribute('placeholder', 'ex: thelanzolini');
+  
+  var add_channel_submit = document.createElement('button');
+  add_channel_submit.innerHTML = 'Submit';
+  add_channel_submit.addEventListener('click', function(){
+    console.log(`submitting add Channel ${add_channel_input.value}`);
+    if(!!add_channel_input.value){
+      client.join(add_channel_input.value);
+      client.part(channel);
+      channel = add_channel_input.value;
+    }
+  });
+  
+  add_channel_container.appendChild(add_channel_label);
+  add_channel_container.appendChild(add_channel_input);
+  add_channel_container.appendChild(add_channel_submit);
+  
   container.innerHTML = '';
   var sounds_elem = document.createElement('div');
   sounds_elem.setAttribute('id', 'soundsContainer');
   container.appendChild(sounds_elem);
   container.insertBefore(logout, sounds_elem);
+  container.insertBefore(add_channel_container, sounds_elem);
   renderSounds();
   renderAddSound();
 }
@@ -148,15 +176,15 @@ function renderAddSound(){
 const joinChannel = (username, key, channel) => {
   const options = {
     options: {
-        debug: true
+      debug: true
     },
     connection: {
-        cluster: "aws",
-        reconnect: true
+      cluster: "aws",
+      reconnect: true
     },
     identity: {
-        username: username,
-        password: key
+      username: username,
+      password: key
     },
     channels: [channel]
   };

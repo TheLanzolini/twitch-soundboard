@@ -20,6 +20,7 @@
   },
   "homepage": "https://thelanzolini.github.io/twitch-soundboard",
   "devDependencies": {
+    "electron-packager": "^7.0.3",
     "electron-prebuilt": "^1.1.2"
   },
   "dependencies": {
