@@ -4,7 +4,7 @@
   "description": "An electron application that plays sound based on chat for a specific channel",
   "main": "main.js",
   "scripts": {
-    "start": "electron main.js"
+    "start": "node_modules/.bin/electron main.js"
   },
   "repository": {
     "type": "git",
@@ -20,10 +20,10 @@
   },
   "homepage": "https://thelanzolini.github.io/twitch-soundboard",
   "devDependencies": {
-    "electron-packager": "^7.0.3",
-    "electron-prebuilt": "^1.1.2"
+    "electron-packager": "^7.0.3"
   },
   "dependencies": {
+    "electron": "^1.7.9",
     "request": "^2.72.0",
     "tmi.js": "0.0.29"
   }

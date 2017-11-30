@@ -10,6 +10,12 @@ let token, client, channel, soundQueue = [], messageQueue = [], timeouts = {}, T
 
 const container = document.getElementById('container');
 
+if (process.env.CLIENT_ID === undefined) {
+  throw new Error('process.env.CLIENT_ID not found. ')
+}
+
+webview.src = 'https://api.twitch.tv/kraken/oauth2/authorize?response_type=token&client_id='+ process.env.CLIENT_ID +'&redirect_uri=http%3A%2F%2Flocalhost&scope=chat_login+user_read'
+
 const uriToJSON = function(uriString){
   return JSON.parse('{"' + decodeURI(uriString).replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}');
 }
@@ -57,18 +63,18 @@ function renderSoundBoard(){
   logout.addEventListener('click', function(){
     ipcRenderer.sendSync('request-logout', true);
   });
-  
+
   var add_channel_container = document.createElement('div');
   add_channel_container.classList.add('add-channel-container');
-  
+
   var add_channel_label = document.createElement('label');
   add_channel_label.setAttribute('for', 'add-channel-input');
   add_channel_label.innerHTML = 'Channel Override';
-  
+
   var add_channel_input = document.createElement('input');
   add_channel_input.setAttribute('id', 'add-channel-input');
   add_channel_input.setAttribute('placeholder', 'ex: thelanzolini');
-  
+
   var add_channel_submit = document.createElement('button');
   add_channel_submit.innerHTML = 'Submit';
   add_channel_submit.addEventListener('click', function(){
@@ -79,11 +85,11 @@ function renderSoundBoard(){
       channel = add_channel_input.value;
     }
   });
-  
+
   add_channel_container.appendChild(add_channel_label);
   add_channel_container.appendChild(add_channel_input);
   add_channel_container.appendChild(add_channel_submit);
-  
+
   container.innerHTML = '';
   var sounds_elem = document.createElement('div');
   sounds_elem.setAttribute('id', 'soundsContainer');
@@ -103,11 +109,11 @@ function renderSounds(){
     var sound_player = document.createElement('audio');
     sound_player.src = sound.path;
     sound_player.setAttribute('controls', true);
-    
+
     var sound_command = document.createElement('span');
     sound_command.classList.add('command');
     sound_command.innerHTML = sound.command;
-    
+
     var sound_delete = document.createElement('button');
     sound_delete.classList.add('delete');
     sound_delete.innerHTML = 'Delete';
@@ -116,15 +122,15 @@ function renderSounds(){
       ipcRenderer.sendSync('save-sounds', {sounds});
       renderSounds();
     });
-    
+
     sound_container.appendChild(sound_player);
     sound_container.appendChild(sound_command);
     sound_container.appendChild(sound_delete);
-    
+
     sound.element = sound_player;
-    
+
     sounds_elem.appendChild(sound_container);
-    
+
   });
 }
 
@@ -226,10 +232,3 @@ setInterval(function(){
     client.say(channel, first);
   }
 }, 2000);
-
-
-
-
-
-
-

@@ -36,3 +36,4 @@ node_modules
 credentials.json
 sounds.json
 latest.txt
+*.ignore
